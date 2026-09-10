@@ -17,8 +17,7 @@ class RelatorioService:
     def listar_historico(self):
         if not self.db: return []
         with self.db.obter_conexao() as conn:
-            repo = HistoricoRepository(conn)
-            return repo.listar_historico_completo()
+            return HistoricoRepository(conn).listar_historico_completo()
 
     def gerar_relatorio_inventario(self, nome_responsavel: str, materiais: List[Dict[str, Any]]) -> Path:
         agora = datetime.now()
@@ -28,30 +27,41 @@ class RelatorioService:
         PASTA_RELATORIOS.mkdir(parents=True, exist_ok=True)
         caminho_arquivo = PASTA_RELATORIOS / nome_arquivo
         
-        with caminho_arquivo.open("w", encoding="utf-8") as arquivo:
-            arquivo.write("=" * 70 + "\n     RELATÓRIO OFICIAL DE INVENTÁRIO\n" + "=" * 70 + "\n")
-            arquivo.write(f"Gerado em: {agora_formatada}\n\n--- POSIÇÃO ATUAL DO ESTOQUE ---\n\n")
-            
-            if not materiais:
-                arquivo.write("Nenhum material cadastrado no sistema.\n")
-            else:
-                arquivo.write(f"{'ID':<5} | {'NOME DO MATERIAL':<25} | {'QTD':<5} | {'OBSERVAÇÕES'}\n")
-                arquivo.write("-" * 70 + "\n")
-                for mat in materiais:
-                    obs = mat.get('observacoes') or "Nenhuma"
-                    nome = mat.get('nome', '')
-                    nome_formatado = nome[:22] + "..." if len(nome) > 25 else nome
-                    arquivo.write(f"{mat['id_material']:<5} | {nome_formatado:<25} | {mat['quantidade']:<5} | {obs}\n")
-            
-            arquivo.write("\n" + "=" * 70 + f"\nRelatório gerado por: {nome_responsavel}\n" + "=" * 70 + "\n")
+        linhas = [
+            "=" * 70 + "\n     RELATÓRIO OFICIAL DE INVENTÁRIO\n" + "=" * 70 + "\n",
+            f"Gerado em: {agora_formatada}\n\n--- POSIÇÃO ATUAL DO ESTOQUE ---\n\n"
+        ]
         
+        if not materiais:
+            linhas.append("Nenhum material cadastrado no sistema.\n")
+        else:
+            linhas.extend([
+                f"{'ID':<5} | {'NOME DO MATERIAL':<25} | {'QTD':<5} | {'OBSERVAÇÕES'}\n",
+                "-" * 70 + "\n"
+            ])
+            for mat in materiais:
+                obs = mat.get('observacoes') or "Nenhuma"
+                nome = mat.get('nome', '')
+                nome_formatado = nome[:22] + "..." if len(nome) > 25 else nome
+                linhas.append(f"{mat['id_material']:<5} | {nome_formatado:<25} | {mat['quantidade']:<5} | {obs}\n")
+        
+        linhas.append("\n" + "=" * 70 + f"\nRelatório gerado por: {nome_responsavel}\n" + "=" * 70 + "\n")
+        
+        # OTIMIZAÇÃO: Escrita em lote única
+        with caminho_arquivo.open("w", encoding="utf-8") as arquivo:
+            arquivo.writelines(linhas)
+            
         return caminho_arquivo
 
     def gerar_grafico_checklist(self, dados_grafico: List[Dict[str, Any]], monitor_responsavel: str, data_hora: str, nome_base_txt: str) -> Path:
-        materiais = [d['material'] for d in dados_grafico][::-1]
-        esperado = [d['esperado'] for d in dados_grafico][::-1]
-        encontrado = [d['encontrado'] for d in dados_grafico][::-1]
-        anotacoes = [d['anotacao'] for d in dados_grafico][::-1]
+        if not dados_grafico:
+            raise ValueError("Não há dados para gerar o gráfico.")
+
+        # OTIMIZAÇÃO: Desempacotamento de dados e reversão da lista em O(N) de uma só vez
+        materiais, esperado, encontrado, anotacoes = zip(*(
+            (d['material'], d['esperado'], d['encontrado'], d['anotacao']) 
+            for d in reversed(dados_grafico)
+        ))
 
         altura_dinamica = max(10.0, len(materiais) * 0.6)
         fig = Figure(figsize=(16, altura_dinamica))

@@ -4,7 +4,7 @@ import os
 import platform
 import subprocess
 
-from modelos import Material, ItemChecklist
+from modelos import ItemChecklist
 from utils.executor import rodar_em_background
 
 class JanelaChecklist(ctk.CTkToplevel):
@@ -15,8 +15,6 @@ class JanelaChecklist(ctk.CTkToplevel):
         self.servico_checklist = servicos["checklist"]
         
         self.title("Check-list Diário")
-        
-        # Geometria ajustada para forçar a janela mais para cima
         self._configurar_geometria_responsiva()
         
         self.transient(master)
@@ -40,21 +38,16 @@ class JanelaChecklist(ctk.CTkToplevel):
         self.btn_salvar.pack(pady=10)
 
     def _configurar_geometria_responsiva(self):
-        """Calcula o tamanho da tela e posiciona a janela mais acima (evitando que fique baixa demais)."""
         largura_janela = 950
         altura_janela = 650
         
         largura_tela = self.winfo_screenwidth()
         altura_tela = self.winfo_screenheight()
         
-        if largura_janela > largura_tela:
-            largura_janela = largura_tela - 50
-        if altura_janela > altura_tela:
-            altura_janela = altura_tela - 80
+        largura_janela = min(largura_janela, largura_tela - 50)
+        altura_janela = min(altura_janela, altura_tela - 80)
             
-        pos_x = max(0, (largura_tela // 2) - (largura_janela // 2))
-        
-        # Posiciona a janela mais para o topo da tela (1/5 da altura total) em vez de centralizar verticalmente
+        pos_x = max(0, (largura_tela - largura_janela) // 2)
         pos_y = max(30, (altura_tela - altura_janela) // 5)
         
         self.geometry(f"{largura_janela}x{altura_janela}+{pos_x}+{pos_y}")
@@ -68,7 +61,7 @@ class JanelaChecklist(ctk.CTkToplevel):
             return False
 
         if not monitores:
-            messagebox.showwarning("Aviso", "Você precisa cadastrar pelo menos um monitor antes de realizar o check-list!", parent=self)
+            messagebox.showwarning("Aviso", "Cadastre pelo menos um monitor antes!", parent=self)
             self.destroy()
             return False
 
@@ -90,14 +83,12 @@ class JanelaChecklist(ctk.CTkToplevel):
         font_cab = ("Segoe UI", 12, "bold")
         cor_cab = "#3498db"
         
-        ctk.CTkLabel(self.frame_cabecalho, text="Material", font=font_cab, text_color=cor_cab).grid(row=0, column=0, padx=10, pady=8, sticky="w")
-        ctk.CTkLabel(self.frame_cabecalho, text="Esperado", font=font_cab, text_color=cor_cab).grid(row=0, column=1, padx=10, pady=8)
-        ctk.CTkLabel(self.frame_cabecalho, text="Encontrado", font=font_cab, text_color=cor_cab).grid(row=0, column=2, padx=10, pady=8)
-        ctk.CTkLabel(self.frame_cabecalho, text="Observação", font=font_cab, text_color=cor_cab).grid(row=0, column=3, padx=10, pady=8)
-        ctk.CTkLabel(self.frame_cabecalho, text="Quarto", font=font_cab, text_color=cor_cab).grid(row=0, column=4, padx=10, pady=8)
+        titulos = ["Material", "Esperado", "Encontrado", "Observação", "Quarto"]
+        for i, texto in enumerate(titulos):
+            sticky = "w" if i == 0 else ""
+            ctk.CTkLabel(self.frame_cabecalho, text=texto, font=font_cab, text_color=cor_cab).grid(row=0, column=i, padx=10, pady=8, sticky=sticky)
         
-        tamanhos = [320, 90, 110, 140, 90]
-        for i, t in enumerate(tamanhos):
+        for i, t in enumerate([320, 90, 110, 140, 90]):
             self.frame_cabecalho.grid_columnconfigure(i, minsize=t)
 
     def _configurar_lista(self):
@@ -108,10 +99,9 @@ class JanelaChecklist(ctk.CTkToplevel):
         novo_index = index + direcao
         if 0 <= novo_index < len(self.lista_entries):
             self.lista_entries[novo_index].focus_set()
-            fracao_rolagem = novo_index / len(self.lista_entries)
             try:
-                self.frame_lista._parent_canvas.yview_moveto(fracao_rolagem)
-            except:
+                self.frame_lista._parent_canvas.yview_moveto(novo_index / len(self.lista_entries))
+            except Exception:
                 pass
         return "break"
 
@@ -119,16 +109,13 @@ class JanelaChecklist(ctk.CTkToplevel):
         try:
             materiais = self.servico_estoque.listar_materiais_ativos()
         except Exception as e:
-            messagebox.showerror("Erro", str(e), parent=self)
-            return
+            return messagebox.showerror("Erro", str(e), parent=self)
             
         if not materiais:
-            ctk.CTkLabel(self.frame_lista, text="Nenhum material cadastrado no sistema.", text_color="#e74c3c", font=("Segoe UI", 12)).pack(pady=20)
-            return
+            return ctk.CTkLabel(self.frame_lista, text="Nenhum material cadastrado no sistema.", text_color="#e74c3c", font=("Segoe UI", 12)).pack(pady=20)
 
         for i, mat in enumerate(materiais):
             bg_color = "#2a2a2a" if i % 2 == 0 else "#1e1e1e"
-
             frame_linha = ctk.CTkFrame(self.frame_lista, fg_color=bg_color, corner_radius=6)
             frame_linha.pack(fill="x", pady=2, padx=5)
 
@@ -145,8 +132,7 @@ class JanelaChecklist(ctk.CTkToplevel):
             entry_quarto = ctk.CTkEntry(frame_linha, width=70, justify="center")
             entry_quarto.grid(row=0, column=4, padx=10, pady=5)
 
-            tamanhos = [320, 90, 110, 140, 90]
-            for col, t in enumerate(tamanhos):
+            for col, t in enumerate([320, 90, 110, 140, 90]):
                 frame_linha.grid_columnconfigure(col, minsize=t)
 
             self.entradas_checklist[mat.id_material] = (mat.nome, mat.quantidade, entry_qtd, combo_obs, entry_quarto)
@@ -161,27 +147,22 @@ class JanelaChecklist(ctk.CTkToplevel):
 
     def iniciar_salvamento(self):
         if not self.entradas_checklist:
-            messagebox.showwarning("Aviso", "Não há materiais para verificar no check-list!", parent=self)
-            return
+            return messagebox.showwarning("Aviso", "Não há materiais no check-list!", parent=self)
             
         monitor_responsavel = self.combo_monitor_resp.get().split(" - ", 1)[1]
         itens_verificados = []
         
-        for id_mat, dados in self.entradas_checklist.items():
-            nome, qtd_esperada, entry, combo_obs, entry_quarto = dados
+        for id_mat, (nome, qtd_esperada, entry, combo_obs, entry_quarto) in self.entradas_checklist.items():
             qtd_txt = entry.get().strip()
             
             if not qtd_txt:
-                messagebox.showerror("Erro", f"Você esqueceu de preencher a quantidade de '{nome}'.", parent=self)
-                return
+                return messagebox.showerror("Erro", f"Você esqueceu de preencher a quantidade de '{nome}'.", parent=self)
                 
             try:
                 qtd_encontrada = int(qtd_txt)
-                if qtd_encontrada < 0:
-                    raise ValueError
+                if qtd_encontrada < 0: raise ValueError
             except ValueError:
-                messagebox.showerror("Erro", f"A quantidade de '{nome}' deve ser um número inteiro positivo!", parent=self)
-                return
+                return messagebox.showerror("Erro", f"A quantidade de '{nome}' deve ser um número inteiro positivo!", parent=self)
                 
             itens_verificados.append(
                 ItemChecklist(
@@ -196,41 +177,36 @@ class JanelaChecklist(ctk.CTkToplevel):
 
         self.btn_salvar.configure(state="disabled", text="Gerando Relatório... Aguarde!", fg_color="#555555")
 
-        def tarefa_pesada():
-            return self.servico_checklist.processar_checklist(monitor_responsavel, itens_verificados)
-            
-        def ao_terminar(resultado):
-            self.finalizar_salvamento(resultado)
-            
-        def ao_falhar(erro):
-            messagebox.showerror("Erro Crítico", f"Falha na geração: {erro}", parent=self)
-            self.btn_salvar.configure(state="normal", text="Salvar e Registrar Check-list", fg_color="#d35400")
-
-        rodar_em_background(self, tarefa_pesada, ao_terminar, ao_falhar)
+        rodar_em_background(
+            self, 
+            self.servico_checklist.processar_checklist, 
+            self.finalizar_salvamento, 
+            lambda erro: self._restaurar_botao_erro(f"Falha na geração: {erro}"),
+            monitor_responsavel=monitor_responsavel,
+            itens=itens_verificados
+        )
+        
+    def _restaurar_botao_erro(self, mensagem):
+        messagebox.showerror("Erro Crítico", mensagem, parent=self)
+        self.btn_salvar.configure(state="normal", text="Salvar e Registrar Check-list", fg_color="#d35400")
 
     def finalizar_salvamento(self, resultado):
         if not self.winfo_exists(): return
         
         if not resultado["sucesso"]:
-            messagebox.showerror("Erro", resultado.get("erro", "Erro desconhecido"), parent=self)
-            self.btn_salvar.configure(state="normal", text="Salvar e Registrar Check-list", fg_color="#d35400")
-            return
+            return self._restaurar_botao_erro(resultado.get("erro", "Erro desconhecido"))
         
         try:
-            sistema_os = platform.system()
             caminho_imagem = resultado["nome_imagem"]
-            
-            if sistema_os == "Windows": 
-                os.startfile(caminho_imagem)
-            elif sistema_os == "Darwin": 
-                subprocess.Popen(["open", caminho_imagem])
-            else: 
-                subprocess.Popen(["xdg-open", caminho_imagem])
+            sistema_os = platform.system()
+            if sistema_os == "Windows": os.startfile(caminho_imagem)
+            elif sistema_os == "Darwin": subprocess.Popen(["open", caminho_imagem])
+            else: subprocess.Popen(["xdg-open", caminho_imagem])
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao abrir a imagem: {e}", parent=self)
 
         if resultado["alertas"]:
-            mensagem_final = f"Check-list pronto!\n\nAlertas:\n\n" + "\n".join(resultado["alertas"])
+            mensagem_final = "Check-list pronto!\n\nAlertas:\n\n" + "\n".join(resultado["alertas"])
             messagebox.showwarning("Atenção!", mensagem_final, parent=self)
         else:
             messagebox.showinfo("Sucesso", "Check-list perfeito! Nenhum item faltando.", parent=self)

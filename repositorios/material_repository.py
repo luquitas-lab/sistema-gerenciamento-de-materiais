@@ -7,10 +7,7 @@ class MaterialRepository:
         self.conn = conexao
 
     def listar_ativos(self) -> List[Material]:
-        cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT id_material, nome, quantidade_material, observacoes, ativo FROM material WHERE ativo = 1"
-        )
+        # OTIMIZAÇÃO: List comprehension iterando diretamente sobre o retorno do banco
         return [
             Material(
                 id_material=linha[0],
@@ -19,26 +16,24 @@ class MaterialRepository:
                 observacoes=linha[3],
                 ativo=bool(linha[4])
             )
-            for linha in cursor.fetchall()
+            for linha in self.conn.execute(
+                "SELECT id_material, nome, quantidade_material, observacoes, ativo FROM material WHERE ativo = 1"
+            )
         ]
 
     def buscar_por_id(self, id_material: int) -> Optional[dict]:
-        cursor = self.conn.cursor()
-        cursor.execute(
+        row = self.conn.execute(
             "SELECT id_material, nome, quantidade_material FROM material WHERE id_material = ? AND ativo = 1", 
             (id_material,)
-        )
-        row = cursor.fetchone()
-        if row:
-            return {"id_material": row[0], "nome": row[1], "quantidade": row[2]}
-        return None
+        ).fetchone()
+        
+        return {"id_material": row[0], "nome": row[1], "quantidade": row[2]} if row else None
 
     def criar_material(self, nome: str, quantidade: int, observacoes: str = "") -> int:
-        cursor = self.conn.execute(
+        return self.conn.execute(
             "INSERT INTO material (nome, quantidade_material, observacoes) VALUES (?, ?, ?)",
             (nome, quantidade, observacoes)
-        )
-        return cursor.lastrowid
+        ).lastrowid
 
     def atualizar_material(self, id_material: int, novo_nome: str, novas_obs: str) -> None:
         self.conn.execute(

@@ -35,10 +35,7 @@ class ChecklistService:
             if obs_texto != "-":
                 info_extra.append(f"Obs: {obs_texto}")
                 if obs_lower in ['pendente', 'danificado']:
-                    if quarto_texto and quarto_texto != '-':
-                        texto_anotacao = f"   [{nome_formatado} no Qto: {quarto_texto}]"
-                    else:
-                        texto_anotacao = f"   [{nome_formatado}]"
+                    texto_anotacao = f"   [{nome_formatado} no Qto: {quarto_texto}]" if (quarto_texto and quarto_texto != '-') else f"   [{nome_formatado}]"
                     
             if quarto_texto != "-":
                 info_extra.append(f"Qto: {quarto_texto}")
@@ -62,7 +59,7 @@ class ChecklistService:
                 status_txt = f"ATENÇÃO: {obs_texto.upper()}"
 
             detalhes_relatorio.append(
-                f"{nome_formatado:<35} | {qtd_esperada:<9} | {qtd_encontrada:<10} | {status_txt:<15} | {obs_texto:<12} | {quarto_texto}"
+                f"{nome_formatado:<35} | {qtd_esperada:<9} | {qtd_encontrada:<10} | {status_txt:<15} | {obs_texto:<12} | {quarto_texto}\n"
             )
             
             dados_grafico.append({
@@ -76,29 +73,32 @@ class ChecklistService:
         nome_base_txt = f"Checklist_{agora_completo.strftime('%Y-%m-%d_%H%M%S')}.txt"
         caminho_arquivo_txt = PASTA_RELATORIOS / nome_base_txt
         
+        # OTIMIZAÇÃO: Gravando tudo na memória primeiro e escrevendo no disco de uma vez
+        linhas_arquivo = [
+            "=" * 105 + "\n",
+            "                                RELATÓRIO DE CHECK-LIST DIÁRIO\n",
+            "=" * 105 + "\n",
+            f"Data e Hora da Conferência: {agora_str}\n",
+            f"Conferido por (Monitor): {monitor_responsavel}\n\n",
+            f"{'MATERIAL':<35} | {'ESPERADO':<9} | {'ENCONTRADO':<10} | {'STATUS':<15} | {'OBSERVAÇÃO':<12} | {'QUARTO'}\n",
+            "-" * 105 + "\n"
+        ]
+        linhas_arquivo.extend(detalhes_relatorio)
+        linhas_arquivo.extend([
+            "\n" + "=" * 105 + "\n",
+            "RESUMO DE DIVERGÊNCIAS E ANOTAÇÕES:\n"
+        ])
+        
+        if alertas:
+            linhas_arquivo.extend(f"{alerta}\n" for alerta in alertas)
+        else:
+            linhas_arquivo.append("Nenhuma divergência de quantidade encontrada. Estoque perfeito!\n")
+            
+        linhas_arquivo.append("=" * 105 + "\n")
+
         try:
             with caminho_arquivo_txt.open("w", encoding="utf-8") as arquivo:
-                arquivo.write("=" * 105 + "\n")
-                arquivo.write("                                RELATÓRIO DE CHECK-LIST DIÁRIO\n")
-                arquivo.write("=" * 105 + "\n")
-                arquivo.write(f"Data e Hora da Conferência: {agora_str}\n")
-                arquivo.write(f"Conferido por (Monitor): {monitor_responsavel}\n\n")
-
-                arquivo.write(f"{'MATERIAL':<35} | {'ESPERADO':<9} | {'ENCONTRADO':<10} | {'STATUS':<15} | {'OBSERVAÇÃO':<12} | {'QUARTO'}\n")
-                arquivo.write("-" * 105 + "\n")
-
-                for linha in detalhes_relatorio:
-                    arquivo.write(linha + "\n")
-
-                arquivo.write("\n" + "=" * 105 + "\n")
-                arquivo.write("RESUMO DE DIVERGÊNCIAS E ANOTAÇÕES:\n")
-                if alertas:
-                    for alerta in alertas:
-                        arquivo.write(alerta + "\n")
-                else:
-                    arquivo.write("Nenhuma divergência de quantidade encontrada. Estoque perfeito!\n")
-                arquivo.write("=" * 105 + "\n")
-
+                arquivo.writelines(linhas_arquivo)
         except Exception as e:
             return {"sucesso": False, "erro": f"Erro ao gerar o arquivo txt: {e}"}
 

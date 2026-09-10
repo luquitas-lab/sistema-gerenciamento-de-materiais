@@ -7,11 +7,9 @@ class MonitorRepository:
         self.conn = conexao
 
     def listar_ativos(self) -> List[Monitor]:
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT id_monitor, nome, ativo FROM monitor WHERE ativo = 1")
         return [
             Monitor(id_monitor=row[0], nome=row[1], ativo=bool(row[2])) 
-            for row in cursor.fetchall()
+            for row in self.conn.execute("SELECT id_monitor, nome, ativo FROM monitor WHERE ativo = 1")
         ]
 
     def criar(self, nome: str) -> None:

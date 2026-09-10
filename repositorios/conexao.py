@@ -11,6 +11,9 @@ class GerenciadorConexao:
     def _otimizar_banco(self):
         with sqlite3.connect(self.caminho_banco) as conn:
             conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;") # Mais rápido e seguro junto com WAL
+            conn.execute("PRAGMA cache_size = -64000;")  # Libera 64MB de RAM para cache de leitura
+            conn.execute("PRAGMA temp_store = MEMORY;")  # Mantém índices e tabelas temporárias na memória
 
     def _inicializar_esquema(self):
         with sqlite3.connect(self.caminho_banco) as conn:
@@ -54,6 +57,12 @@ class GerenciadorConexao:
                     detalhes TEXT,
                     FOREIGN KEY (id_monitor) REFERENCES monitor(id_monitor)
                 )''')
+
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_material_ativo ON material(ativo);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_monitor_ativo ON monitor(ativo);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_historico_monitor ON historico_movimentacoes(id_monitor);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_entrada_material ON entrada(id_material);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_danos_material ON danos(id_material);")
 
     @contextmanager
     def obter_conexao(self):

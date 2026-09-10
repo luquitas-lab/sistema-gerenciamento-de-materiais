@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.db
 
 # Banco de Dados Local (Não suba dados reais/de teste para o repositório)
 materiais.db

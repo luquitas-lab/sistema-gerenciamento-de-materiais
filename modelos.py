@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from typing import Optional
 
-@dataclass
+@dataclass(slots=True)
 class Monitor:
     id_monitor: int
     nome: str
     ativo: bool = True
 
-@dataclass
+@dataclass(slots=True)
 class Material:
     id_material: int
     nome: str
@@ -15,7 +15,7 @@ class Material:
     observacoes: Optional[str] = None
     ativo: bool = True
 
-@dataclass
+@dataclass(slots=True)
 class ItemChecklist:
     id_material: int
     nome_material: str

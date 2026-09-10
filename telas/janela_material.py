@@ -10,15 +10,16 @@ class JanelaMaterial(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
 
+        self._cache_materiais = {}
+
         if not self._configurar_monitor_responsavel():
             return
 
         self.abas = ctk.CTkTabview(self, corner_radius=10, fg_color="#1e1e1e")
         self.abas.pack(fill="both", expand=True, padx=20, pady=(5, 20))
 
-        self.abas.add(" Cadastrar Novo ")
-        self.abas.add(" Atualizar ")
-        self.abas.add(" Deletar ")
+        for aba in [" Cadastrar Novo ", " Atualizar ", " Deletar "]:
+            self.abas.add(aba)
 
         self.aba_cadastrar = self.abas.tab(" Cadastrar Novo ")
         self.aba_atualizar = self.abas.tab(" Atualizar ")
@@ -55,18 +56,16 @@ class JanelaMaterial(ctk.CTkToplevel):
     def _construir_aba_cadastrar(self):
         ctk.CTkLabel(self.aba_cadastrar, text="Cadastrar Novo Material", font=("Segoe UI", 18, "bold"), text_color="#e0e0e0").pack(pady=(15, 15))
         
-        ctk.CTkLabel(self.aba_cadastrar, text="Nome do Material (ex: Raquete):", text_color="#a0a0a0").pack(anchor="w", padx=40, pady=(5, 0))
-        self.entry_nome = ctk.CTkEntry(self.aba_cadastrar, width=320, height=35)
-        self.entry_nome.pack(pady=5)
-        
-        ctk.CTkLabel(self.aba_cadastrar, text="Quantidade Inicial no Estoque:", text_color="#a0a0a0").pack(anchor="w", padx=40, pady=(10, 0))
-        self.entry_quantidade = ctk.CTkEntry(self.aba_cadastrar, width=320, height=35)
-        self.entry_quantidade.pack(pady=5)
-        
-        ctk.CTkLabel(self.aba_cadastrar, text="Observações (Marca, Cor, etc):", text_color="#a0a0a0").pack(anchor="w", padx=40, pady=(10, 0))
-        self.entry_obs = ctk.CTkEntry(self.aba_cadastrar, width=320, height=35)
-        self.entry_obs.pack(pady=5)
-        
+        campos = [("Nome do Material (ex: Raquete):", "entry_nome"), 
+                  ("Quantidade Inicial no Estoque:", "entry_quantidade"),
+                  ("Observações (Marca, Cor, etc):", "entry_obs")]
+                  
+        for texto, attr in campos:
+            ctk.CTkLabel(self.aba_cadastrar, text=texto, text_color="#a0a0a0").pack(anchor="w", padx=40, pady=(10 if attr != "entry_nome" else 5, 0))
+            entry = ctk.CTkEntry(self.aba_cadastrar, width=320, height=35)
+            entry.pack(pady=5)
+            setattr(self, attr, entry)
+            
         ctk.CTkButton(self.aba_cadastrar, text="Salvar Material", command=self.salvar_material, 
                       fg_color="#27ae60", hover_color="#2ecc71", font=("Segoe UI", 12, "bold"), height=40).pack(pady=25)
 
@@ -88,20 +87,6 @@ class JanelaMaterial(ctk.CTkToplevel):
         ctk.CTkButton(self.aba_atualizar, text="Atualizar Material", command=self.btn_atualizar_mat_click, 
                       fg_color="#2980b9", hover_color="#3498db", font=("Segoe UI", 12, "bold"), height=40).pack(pady=25)
 
-    def preencher_dados_atuais(self, valor_selecionado=None):
-        selecionado = self.combo_atualizar_mat.get()
-        if not selecionado: return
-        
-        id_mat = int(selecionado.split(" - ")[0])
-        material = next((m for m in self.servico_estoque.listar_materiais_ativos() if m.id_material == id_mat), None)
-        
-        if material:
-            self.entry_novo_nome_mat.delete(0, 'end')
-            self.entry_novo_nome_mat.insert(0, material.nome) 
-            self.entry_novas_obs.delete(0, 'end')
-            if material.observacoes: 
-                self.entry_novas_obs.insert(0, material.observacoes)
-
     def _construir_aba_deletar(self):
         ctk.CTkLabel(self.aba_deletar, text="Deletar Material", font=("Segoe UI", 18, "bold"), text_color="#e74c3c").pack(pady=(35, 15))
         
@@ -112,23 +97,37 @@ class JanelaMaterial(ctk.CTkToplevel):
         ctk.CTkButton(self.aba_deletar, text="🗑️ Deletar Material", command=self.btn_deletar_mat_click, 
                       fg_color="#c0392b", hover_color="#e74c3c", font=("Segoe UI", 12, "bold"), height=40).pack(pady=35)
 
+    def preencher_dados_atuais(self, valor_selecionado=None):
+        selecionado = self.combo_atualizar_mat.get()
+        if not selecionado: return
+        
+        id_mat = int(selecionado.split(" - ")[0])
+        
+        material = self._cache_materiais.get(id_mat)
+        
+        if material:
+            self.entry_novo_nome_mat.delete(0, 'end')
+            self.entry_novo_nome_mat.insert(0, material.nome) 
+            self.entry_novas_obs.delete(0, 'end')
+            if material.observacoes: 
+                self.entry_novas_obs.insert(0, material.observacoes)
+
     def atualizar_listas_mat(self):
-        sel_atual = self.combo_atualizar_mat.get().split(" - ")[0] if self.combo_atualizar_mat.get() else None
-        sel_del = self.combo_deletar_mat.get().split(" - ")[0] if self.combo_deletar_mat.get() else None
+        sel_atual = self.combo_atualizar_mat.get()
+        sel_del = self.combo_deletar_mat.get()
 
         try:
             materiais = self.servico_estoque.listar_materiais_ativos()
+            self._cache_materiais = {m.id_material: m for m in materiais}
+            
             lista_formatada = [f"{m.id_material} - {m.nome}" for m in materiais]
             
             if lista_formatada:
                 self.combo_atualizar_mat.configure(values=lista_formatada)
                 self.combo_deletar_mat.configure(values=lista_formatada)
                 
-                idx_atual = next((i for i, v in enumerate(lista_formatada) if v.startswith(f"{sel_atual} - ")), 0)
-                idx_del = next((i for i, v in enumerate(lista_formatada) if v.startswith(f"{sel_del} - ")), 0)
-                
-                self.combo_atualizar_mat.set(lista_formatada[idx_atual])
-                self.combo_deletar_mat.set(lista_formatada[idx_del])
+                self.combo_atualizar_mat.set(sel_atual if sel_atual in lista_formatada else lista_formatada[0])
+                self.combo_deletar_mat.set(sel_del if sel_del in lista_formatada else lista_formatada[0])
                 self.preencher_dados_atuais()
             else:
                 self.combo_atualizar_mat.configure(values=[""])
@@ -143,16 +142,13 @@ class JanelaMaterial(ctk.CTkToplevel):
     def salvar_material(self):
         nome = self.entry_nome.get().strip()
         quantidade_texto = self.entry_quantidade.get()
-        observacoes = self.entry_obs.get()
         
         if not nome or not quantidade_texto:
-            messagebox.showerror("Erro", "Nome e quantidade são obrigatórios!", parent=self)
-            return
+            return messagebox.showerror("Erro", "Nome e quantidade são obrigatórios!", parent=self)
             
-        nomes_existentes = [item.split(" - ", 1)[1].lower() for item in self.combo_atualizar_mat.cget("values") if item]
+        nomes_existentes = [m.nome.lower() for m in self._cache_materiais.values()]
         if nome.lower() in nomes_existentes:
-            messagebox.showwarning("Aviso", f"Já existe material '{nome}'!", parent=self)
-            return
+            return messagebox.showwarning("Aviso", f"Já existe material '{nome}'!", parent=self)
 
         try:
             quantidade = int(quantidade_texto)
@@ -162,7 +158,7 @@ class JanelaMaterial(ctk.CTkToplevel):
             
         try:
             id_monitor = int(self.combo_monitor_resp.get().split(" - ")[0])
-            self.servico_estoque.criar_material(nome, quantidade, observacoes, id_monitor=id_monitor)
+            self.servico_estoque.criar_material(nome, quantidade, self.entry_obs.get(), id_monitor=id_monitor)
             
             messagebox.showinfo("Sucesso", f"Material '{nome}' cadastrado!", parent=self)
             self.entry_nome.delete(0, 'end')
@@ -175,20 +171,20 @@ class JanelaMaterial(ctk.CTkToplevel):
     def btn_atualizar_mat_click(self):
         selecionado = self.combo_atualizar_mat.get()
         novo_nome = self.entry_novo_nome_mat.get().strip()
-        novas_obs = self.entry_novas_obs.get()
         
         if not selecionado or not novo_nome:
             return messagebox.showerror("Erro", "Selecione o material e preencha o novo nome!", parent=self)
         
-        if novo_nome.lower() != selecionado.split(" - ", 1)[1].lower():
-            if novo_nome.lower() in [item.split(" - ", 1)[1].lower() for item in self.combo_atualizar_mat.cget("values") if item]:
+        id_mat = int(selecionado.split(" - ")[0])
+        material_antigo = self._cache_materiais.get(id_mat)
+        
+        if novo_nome.lower() != material_antigo.nome.lower():
+            if novo_nome.lower() in [m.nome.lower() for m in self._cache_materiais.values()]:
                 return messagebox.showwarning("Aviso", "Já existe outro material com esse nome!", parent=self)
 
         try:
-            id_mat = int(selecionado.split(" - ")[0])
             id_monitor = int(self.combo_monitor_resp.get().split(" - ")[0])
-            
-            self.servico_estoque.atualizar_material(id_mat, novo_nome, novas_obs, id_monitor=id_monitor)
+            self.servico_estoque.atualizar_material(id_mat, novo_nome, self.entry_novas_obs.get(), id_monitor=id_monitor)
             
             messagebox.showinfo("Sucesso", "Material atualizado!", parent=self)
             self.entry_novo_nome_mat.delete(0, 'end')
@@ -207,7 +203,6 @@ class JanelaMaterial(ctk.CTkToplevel):
                 id_monitor = int(self.combo_monitor_resp.get().split(" - ")[0])
                 
                 self.servico_estoque.deletar_material(id_mat, id_monitor=id_monitor)
-                
                 messagebox.showinfo("Sucesso", "Material deletado com sucesso!", parent=self)
                 self.atualizar_listas_mat()
             except Exception as e:

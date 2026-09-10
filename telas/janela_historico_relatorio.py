@@ -34,6 +34,9 @@ class JanelaHistorico(ctk.CTkToplevel):
             self.tree.column(col, width=tamanhos_colunas[col], anchor="w")
             
         self.tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)
+        
+        self.tree.tag_configure('par', background='#222222')
+        self.tree.tag_configure('impar', background='#1e1e1e')
         self.carregar_historico()
 
     def carregar_historico(self):
@@ -43,14 +46,9 @@ class JanelaHistorico(ctk.CTkToplevel):
         try:
             historico = self.servico_relatorios.listar_historico()
             for i, log in enumerate(historico):
-                tag = 'par' if i % 2 == 0 else 'impar'
-                self.tree.insert("", "end", values=log, tags=(tag,))
-                
-            self.tree.tag_configure('par', background='#222222')
-            self.tree.tag_configure('impar', background='#1e1e1e')
+                self.tree.insert("", "end", values=log, tags=('par' if i % 2 == 0 else 'impar',))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar histórico: {e}", parent=self)
-
 
 class JanelaRelatorio(ctk.CTkToplevel):
     def __init__(self, master, servicos):
@@ -89,25 +87,16 @@ class JanelaRelatorio(ctk.CTkToplevel):
                       font=("Segoe UI", 12, "bold"), height=40).pack(pady=20)
 
     def confirmar_e_gerar(self):
-        monitor_selecionado = self.combo_monitores.get()
-        nome_responsavel = monitor_selecionado.split(" - ", 1)[1]
-        
+        nome_responsavel = self.combo_monitores.get().split(" - ", 1)[1]
         try:
             materiais_objetos = self.servico_estoque.listar_materiais_ativos()
             
             materiais_dicts = [
-                {
-                    "id_material": mat.id_material,
-                    "nome": mat.nome,
-                    "quantidade": mat.quantidade,
-                    "observacoes": mat.observacoes
-                } for mat in materiais_objetos
+                {"id_material": m.id_material, "nome": m.nome, "quantidade": m.quantidade, "observacoes": m.observacoes} 
+                for m in materiais_objetos
             ]
             
-            caminho_arquivo = self.servico_relatorios.gerar_relatorio_inventario(
-                nome_responsavel, materiais_dicts
-            )
-            
+            caminho_arquivo = self.servico_relatorios.gerar_relatorio_inventario(nome_responsavel, materiais_dicts)
             messagebox.showinfo("Sucesso", f"Relatório gerado em:\n{caminho_arquivo}", parent=self)
             self.destroy()
         except Exception as e:

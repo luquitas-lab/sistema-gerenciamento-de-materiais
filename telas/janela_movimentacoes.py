@@ -36,6 +36,7 @@ class JanelaMovimentacoes(ctk.CTkToplevel):
             messagebox.showerror("Erro", str(e), parent=self)
             self.destroy()
             return False
+            
         if not monitores:
             messagebox.showwarning("Aviso", "Cadastre um monitor antes!", parent=self)
             self.destroy()
@@ -90,35 +91,33 @@ class JanelaMovimentacoes(ctk.CTkToplevel):
                       fg_color="#c0392b", hover_color="#e74c3c", font=("Segoe UI", 12, "bold"), height=40).pack(pady=25)
 
     def atualizar_combos_mov(self):
-        sel_ent = self.combo_mat_ent.get().split(" - ")[0] if self.combo_mat_ent.get() else None
-        sel_dano = self.combo_mat_dano.get().split(" - ")[0] if self.combo_mat_dano.get() else None
+        sel_ent = self.combo_mat_ent.get()
+        sel_dano = self.combo_mat_dano.get()
 
         try:
             materiais = self.servico_estoque.listar_materiais_ativos()
-            lista_formatada = [f"{m.id_material} - {m.nome} (Atual: {m.quantidade})" for m in materiais]
+            id_str_map = {str(m.id_material): f"{m.id_material} - {m.nome} (Atual: {m.quantidade})" for m in materiais}
+            lista_formatada = list(id_str_map.values())
             
             if lista_formatada:
                 self.combo_mat_ent.configure(values=lista_formatada)
                 self.combo_mat_dano.configure(values=lista_formatada)
                 
-                idx_ent = next((i for i, v in enumerate(lista_formatada) if v.startswith(f"{sel_ent} - ")), 0)
-                idx_dano = next((i for i, v in enumerate(lista_formatada) if v.startswith(f"{sel_dano} - ")), 0)
+                # Preserva a seleção extraindo o ID, ou define o primeiro se for inválido
+                id_ent = sel_ent.split(" - ")[0] if sel_ent else None
+                id_dano = sel_dano.split(" - ")[0] if sel_dano else None
                 
-                self.combo_mat_ent.set(lista_formatada[idx_ent])
-                self.combo_mat_dano.set(lista_formatada[idx_dano])
+                self.combo_mat_ent.set(id_str_map.get(id_ent, lista_formatada[0]))
+                self.combo_mat_dano.set(id_str_map.get(id_dano, lista_formatada[0]))
             else:
-                self.combo_mat_ent.configure(values=[""])
-                self.combo_mat_dano.configure(values=[""])
-                self.combo_mat_ent.set("")
-                self.combo_mat_dano.set("")
+                for combo in (self.combo_mat_ent, self.combo_mat_dano):
+                    combo.configure(values=[""])
+                    combo.set("")
         except Exception as e:
             messagebox.showerror("Erro", f"Erro: {e}", parent=self)
 
-    def confirmar_entrada(self):
-        selecionado = self.combo_mat_ent.get()
-        qtd_texto = self.entry_qtd_ent.get().strip()
-        data_texto = self.entry_data_ent.get().strip()
-        
+    def processar_movimentacao(self, acao_func, combo_selecionado, qtd_texto, data_texto, msg_sucesso):
+        selecionado = combo_selecionado.get()
         if not selecionado or not qtd_texto or not data_texto:
             return messagebox.showerror("Erro", "Preencha todos os campos obrigatórios!", parent=self)
             
@@ -129,49 +128,11 @@ class JanelaMovimentacoes(ctk.CTkToplevel):
             id_mat = int(selecionado.split(" - ")[0])
             id_mon = int(self.combo_monitor_resp.get().split(" - ")[0])
 
-            self.servico_estoque.registrar_entrada_material(
-                id_material=id_mat,
-                quantidade_adicionada=quantidade,
-                id_monitor=id_mon,
-                data_entrada=data_texto
-            )
+            acao_func(id_material=id_mat, quantidade=quantidade, id_monitor=id_mon, data=data_texto)
 
-            messagebox.showinfo("Sucesso", "Entrada registrada e estoque atualizado!", parent=self)
-            self.entry_qtd_ent.delete(0, 'end')
-            self.atualizar_combos_mov()  
-
-        except ValueError:
-            messagebox.showerror("Erro de Preenchimento", "Verifique os dados:\n- Quantidade deve ser um número inteiro positivo.\n- Data deve ser ANO-MÊS-DIA.", parent=self)
-        except MaterialNaoEncontradoError as e:
-            messagebox.showerror("Erro de Material", str(e), parent=self)
-        except Exception as e:
-            messagebox.showerror("Erro Crítico", f"Falha interna no sistema:\n{e}", parent=self)
-
-    def confirmar_dano(self):
-        selecionado = self.combo_mat_dano.get()
-        qtd_texto = self.entry_qtd_dano.get().strip()
-        data_texto = self.entry_data_dano.get().strip()
-
-        if not selecionado or not qtd_texto or not data_texto:
-            return messagebox.showerror("Erro", "Preencha todos os campos obrigatórios!", parent=self)
-
-        try:
-            quantidade = int(qtd_texto)
-            datetime.strptime(data_texto, "%Y-%m-%d") 
-            
-            id_mat = int(selecionado.split(" - ")[0])
-            id_mon = int(self.combo_monitor_resp.get().split(" - ")[0])
-
-            self.servico_estoque.registrar_baixa_por_dano(
-                id_material=id_mat,
-                quantidade_perdida=quantidade,
-                id_monitor=id_mon,
-                data_baixa=data_texto
-            )
-
-            messagebox.showinfo("Sucesso", "Dano registrado e estoque atualizado!", parent=self)
-            self.entry_qtd_dano.delete(0, 'end')
-            self.atualizar_combos_mov()  
+            messagebox.showinfo("Sucesso", msg_sucesso, parent=self)
+            self.atualizar_combos_mov()
+            return True
 
         except ValueError:
             messagebox.showerror("Erro de Preenchimento", "Verifique os dados:\n- Quantidade deve ser um número inteiro positivo.\n- Data deve ser ANO-MÊS-DIA.", parent=self)
@@ -180,4 +141,25 @@ class JanelaMovimentacoes(ctk.CTkToplevel):
         except MaterialNaoEncontradoError as e:
             messagebox.showerror("Erro de Material", str(e), parent=self)
         except Exception as e:
-            messagebox.showerror("Erro Crítico", f"Falha interna no sistema:\n{e}", parent=self)
+            messagebox.showerror("Erro Crítico", f"Falha interna:\n{e}", parent=self)
+        return False
+
+    def confirmar_entrada(self):
+        if self.processar_movimentacao(
+            acao_func=lambda **kw: self.servico_estoque.registrar_entrada_material(kw['id_material'], kw['quantidade'], kw['id_monitor'], kw['data']),
+            combo_selecionado=self.combo_mat_ent,
+            qtd_texto=self.entry_qtd_ent.get().strip(),
+            data_texto=self.entry_data_ent.get().strip(),
+            msg_sucesso="Entrada registrada e estoque atualizado!"
+        ):
+            self.entry_qtd_ent.delete(0, 'end')
+
+    def confirmar_dano(self):
+        if self.processar_movimentacao(
+            acao_func=lambda **kw: self.servico_estoque.registrar_baixa_por_dano(kw['id_material'], kw['quantidade'], kw['id_monitor'], kw['data']),
+            combo_selecionado=self.combo_mat_dano,
+            qtd_texto=self.entry_qtd_dano.get().strip(),
+            data_texto=self.entry_data_dano.get().strip(),
+            msg_sucesso="Dano registrado e estoque atualizado!"
+        ):
+            self.entry_qtd_dano.delete(0, 'end')

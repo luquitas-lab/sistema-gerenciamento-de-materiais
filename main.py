@@ -20,6 +20,7 @@ class App(ctk.CTk):
         self.title("Sistema de Gerenciamento de Materiais")
         self.configure(fg_color="#121212") 
         
+        # Inicialização única de dependências
         self.gerenciador_conexao = GerenciadorConexao()
         self.estoque_service = EstoqueService(self.gerenciador_conexao)
         self.relatorios_service = RelatorioService(self.gerenciador_conexao)
@@ -30,12 +31,10 @@ class App(ctk.CTk):
         self._construir_menu()
 
     def _configurar_geometria(self):
-        largura_janela = 500
-        altura_janela = 680
-        largura_tela = self.winfo_screenwidth()
-        altura_tela = self.winfo_screenheight()
-        pos_x = (largura_tela // 2) - (largura_janela // 2)
-        pos_y = (altura_tela // 2) - (altura_janela // 2)
+        largura_janela, altura_janela = 500, 680
+        # Otimização de cálculo de tela
+        pos_x = (self.winfo_screenwidth() - largura_janela) // 2
+        pos_y = (self.winfo_screenheight() - altura_janela) // 2
         self.geometry(f"{largura_janela}x{altura_janela}+{pos_x}+{pos_y}")
 
     def _construir_menu(self):
@@ -58,18 +57,14 @@ class App(ctk.CTk):
             "font": ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             "anchor": "center", 
             "border_width": 1,         
-            "border_color": "#444444" 
+            "border_color": "#444444",
+            "fg_color": "#2a2a2a",      
+            "text_color": "#ffffff",    
+            "hover_color": "#3a3a3a"
         }
 
-        pacote_servicos = {
-            "estoque": self.estoque_service,
-            "checklist": self.checklist_service
-        }
-
-        pacote_servicos_relatorio = {
-            "estoque": self.estoque_service,
-            "relatorios": self.relatorios_service
-        }
+        pacote_servicos = {"estoque": self.estoque_service, "checklist": self.checklist_service}
+        pacote_servicos_relatorio = {"estoque": self.estoque_service, "relatorios": self.relatorios_service}
 
         botoes = [
             ("  Gerenciar Monitores", JanelaMonitor, self.estoque_service),
@@ -81,19 +76,21 @@ class App(ctk.CTk):
         ]
 
         for texto, classe, dependencia in botoes:
-            btn = ctk.CTkButton(self.frame_principal, text=texto, 
-                                command=lambda c=classe, dep=dependencia: self.abrir_tela(c, dep),
-                                fg_color="#2a2a2a",      
-                                text_color="#ffffff",    
-                                hover_color="#3a3a3a",   
-                                **btn_kwargs)
+            btn = ctk.CTkButton(
+                self.frame_principal, 
+                text=texto, 
+                command=lambda c=classe, dep=dependencia: self.abrir_tela(c, dep),
+                **btn_kwargs
+            )
             btn.pack(pady=8)
 
-        btn_sair = ctk.CTkButton(self.frame_principal, text="Sair do Sistema", 
-                                command=self.fechar_sistema, 
-                                fg_color="#c0392b", hover_color="#a53125", 
-                                text_color="#ffffff", width=300, height=45, 
-                                corner_radius=8, font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"))
+        btn_sair = ctk.CTkButton(
+            self.frame_principal, text="Sair do Sistema", 
+            command=self.fechar_sistema, 
+            fg_color="#c0392b", hover_color="#a53125", text_color="#ffffff", 
+            width=300, height=45, corner_radius=8, 
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+        )
         btn_sair.pack(pady=(30, 20))
 
     def abrir_tela(self, ClasseDaJanela, dependencia):

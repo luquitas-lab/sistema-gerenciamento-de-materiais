@@ -10,12 +10,13 @@ class JanelaMonitor(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
         
+        self._cache_monitores = {}
+        
         self.abas = ctk.CTkTabview(self, corner_radius=10, fg_color="#1e1e1e")
         self.abas.pack(fill="both", expand=True, padx=20, pady=20)
 
-        self.abas.add(" Cadastrar ")
-        self.abas.add(" Atualizar ")
-        self.abas.add(" Deletar ")
+        for aba in [" Cadastrar ", " Atualizar ", " Deletar "]:
+            self.abas.add(aba)
 
         self.aba_cadastrar = self.abas.tab(" Cadastrar ")
         self.aba_atualizar = self.abas.tab(" Atualizar ")
@@ -65,39 +66,37 @@ class JanelaMonitor(ctk.CTkToplevel):
         if not selecionado: return
         
         id_mon = int(selecionado.split(" - ")[0])
-        monitor = next((m for m in self.servico_estoque.listar_monitores_ativos() if m.id_monitor == id_mon), None)
+        monitor = self._cache_monitores.get(id_mon)
         
         if monitor:
             self.entry_novo_nome.delete(0, 'end')
             self.entry_novo_nome.insert(0, monitor.nome)
 
     def atualizar_listas(self):
-        sel_atual = self.combo_atualizar.get().split(" - ")[0] if self.combo_atualizar.get() else None
+        sel_atual = self.combo_atualizar.get()
         try:
             monitores = self.servico_estoque.listar_monitores_ativos()
+            self._cache_monitores = {m.id_monitor: m for m in monitores}
             lista_formatada = [f"{m.id_monitor} - {m.nome}" for m in monitores]
             
             if lista_formatada:
                 self.combo_atualizar.configure(values=lista_formatada)
                 self.combo_deletar.configure(values=lista_formatada)
                 
-                idx_atual = next((i for i, v in enumerate(lista_formatada) if v.startswith(f"{sel_atual} - ")), 0)
-                self.combo_atualizar.set(lista_formatada[idx_atual])
+                self.combo_atualizar.set(sel_atual if sel_atual in lista_formatada else lista_formatada[0])
                 self.combo_deletar.set(lista_formatada[0])
                 self.preencher_dados_atuais()
             else:
-                self.combo_atualizar.configure(values=[""])
-                self.combo_deletar.configure(values=[""])
-                self.combo_atualizar.set("")
-                self.combo_deletar.set("")
+                for combo in (self.combo_atualizar, self.combo_deletar):
+                    combo.configure(values=[""])
+                    combo.set("")
                 self.entry_novo_nome.delete(0, 'end')
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar listas: {e}", parent=self)
 
     def salvar_monitor(self):
         nome = self.entry_nome_mon.get().strip()
-        if not nome: 
-            return messagebox.showerror("Erro", "O nome é obrigatório!", parent=self)
+        if not nome: return messagebox.showerror("Erro", "O nome é obrigatório!", parent=self)
             
         try:
             self.servico_estoque.criar_monitor(nome)
@@ -117,7 +116,6 @@ class JanelaMonitor(ctk.CTkToplevel):
         try:
             id_monitor = int(selecionado.split(" - ")[0])
             self.servico_estoque.atualizar_monitor(id_monitor, novo_nome)
-            
             messagebox.showinfo("Sucesso", "Monitor atualizado com sucesso!", parent=self)
             self.entry_novo_nome.delete(0, 'end')
             self.atualizar_listas()
@@ -133,7 +131,6 @@ class JanelaMonitor(ctk.CTkToplevel):
             try:
                 id_monitor = int(selecionado.split(" - ")[0])
                 self.servico_estoque.deletar_monitor(id_monitor)
-                
                 messagebox.showinfo("Sucesso", "Monitor deletado com sucesso!", parent=self)
                 self.atualizar_listas()
             except Exception as e:
